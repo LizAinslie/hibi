@@ -22,8 +22,8 @@ import { createDictionaryApi, type DictionaryApi } from './api'
 import {
   addCustomWord,
   customWordsProvider,
-  listCustomWords,
   openCustomWords,
+  readCustomWords,
 } from './custom-words'
 import css from './dictionary.css?inline'
 import { detectLangs, type LookupTarget, matchCase, wordAt } from './lookup'
@@ -41,7 +41,7 @@ import {
   type Source,
 } from './providers'
 import { SideView } from './SideView'
-import { languageNames, readPreferences, readRecentPack } from './settings'
+import { languageNames, readPreferences } from './settings'
 import sideCss from './side-view.css?inline'
 
 function richTarget(
@@ -338,22 +338,6 @@ export default defineAddon({
   stop: () => stopAddon?.(),
   start(context) {
     context.styles.register('dictionary', css)
-    queueMicrotask(() => {
-      const preferences = readPreferences()
-      const recent = readRecentPack()
-      const ids = [
-        ...new Set([
-          preferences.latin,
-          preferences.han,
-          ...(recent ? [recent] : []),
-        ]),
-      ]
-      void context.native
-        .query('preloadPacks', ids)
-        .catch((error) =>
-          console.error('could not preload dictionary packs:', error),
-        )
-    })
     const registry = createRegistry()
     registry.register(wiktionaryProvider(context.host.network.getText))
     registry.register(datamuseProvider(context.host.network.getText))
@@ -384,6 +368,7 @@ export default defineAddon({
     const sourceViews = new Map<EditorView, ViewId>()
     context.editor.registerRich({
       id: 'lookup',
+      preview: 'deferred',
       attach(editor, editorContext) {
         if (!editorContext) return () => {}
         richEditors.set(editor, editorContext.viewId)
@@ -593,7 +578,7 @@ export default defineAddon({
       createDictionaryApi(
         context.native,
         () => detectLangs('word', readPreferences()),
-        listCustomWords,
+        readCustomWords,
       ),
     )
     stopAddon = () => {

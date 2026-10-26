@@ -44,10 +44,10 @@ import {
 } from './sideload'
 import { testPause } from './test-pauses'
 import {
-  getWorkspace,
   refreshWorkspace,
   resolveWorkspaceFile,
   snapshotWorkspace,
+  workspaceEntries,
   workspaceId,
   workspaceRoot,
 } from './workspace'
@@ -665,7 +665,7 @@ export async function invokeAddon(
   id: unknown,
   method: unknown,
   input: unknown,
-  query = false,
+  kind: 'invoke' | 'query' | 'profile' = 'invoke',
 ): Promise<unknown> {
   if (typeof id !== 'string' || typeof method !== 'string')
     throw new Error('Enable this addon in Settings → Addons first.')
@@ -677,13 +677,19 @@ export async function invokeAddon(
     throw new Error(
       'This addon was disabled. Enable it in Settings → Addons to continue.',
     )
-  const handlers = query ? addon?.queries : addon?.methods
+  const handlers =
+    kind === 'profile'
+      ? addon?.profileMethods
+      : kind === 'query'
+        ? addon?.queries
+        : addon?.methods
   if (!handlers || !Object.hasOwn(handlers, method))
     throw new Error('This addon does not support the requested action.')
   const handler = handlers[method]
   if (!handler)
     throw new Error('This addon does not support the requested action.')
   return handler(input, {
+    isCurrent: () => isAddonActivationCurrent(id, generation),
     dependencies: {
       resolve: async (dependency) =>
         (await import('./dependencies')).resolveDependency(id, dependency),
@@ -698,7 +704,7 @@ export async function invokeAddon(
             'This document is no longer in the workspace. Open it again.',
           )
         async function find(
-          entries: import('../shared/workspace').WorkspaceEntry[],
+          entries: readonly import('../shared/workspace').WorkspaceEntry[],
         ): Promise<string | null> {
           for (const entry of entries) {
             if (entry.children) {
@@ -712,7 +718,7 @@ export async function invokeAddon(
           }
           return null
         }
-        const path = await find(getWorkspace()?.entries ?? [])
+        const path = await find(workspaceEntries())
         if (!path)
           throw new Error(
             'This document is no longer in the workspace. Open it again.',
